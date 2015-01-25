@@ -1,10 +1,11 @@
 var expect = require('chai').expect,
     bytewise = require('bytewise'),
-    levelup = require('levelup'),
+    level = require('level'),
     path = require('path'),
     subindex = require('../index'),
     pairs = require('pairs'),
-    rimraf = require('rimraf');
+    rimraf = require('rimraf'),
+    fs = require('fs');
 
 function encode(key) {
   return bytewise.encode(key).toString('hex');
@@ -18,12 +19,44 @@ function log() {
   console.error.apply(console, [].slice.apply(arguments));
 }
 
+var dbidx = 0;
+
+function nextLocation() {
+  return path.join(__dirname, 'test-db_' + dbidx++);
+}
+
+function cleanup(callback) {
+  fs.readdir(path.join(__dirname), function (err, list) {
+    if (err) return callback(err);
+
+    list = list.filter(function (f) {
+      return (/^test-db_/).test(f);
+    });
+
+    if (!list.length)
+      return callback();
+
+    var ret = 0;
+
+    list.forEach(function (f) {
+      rimraf(path.join(__dirname, f), function () {
+        if (++ret == list.length)
+          callback();
+      });
+    });
+  });
+}
+
+after(function (done) {
+  cleanup(done);
+});
+
+
 describe('level-index', function() {
-  var db, dbPath = path.join(__dirname, '..', 'data', 'test-db');
+  var db;
 
   beforeEach(function(done) {
-    rimraf.sync(dbPath);
-    db = levelup(dbPath, { valueEncoding: 'json' }, done);
+    db = level(nextLocation(), { valueEncoding: 'json', errorIfExists: true, createIfMissing: true }, done);
   });
 
   afterEach(function(done) {
